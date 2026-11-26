@@ -31,7 +31,7 @@ local function discover(id,c)
     F.db.discoveryCount=(F.db.discoveryCount or 0)+1
     c.unseen=F.db.discoveryCount
     if F.discovered then F.discovered(id) end
-    F.say(c.name.." discovered. Open /fd to inspect your card.")
+    if F.db.collectionChat~=false then F.say(c.name.." discovered. Open /fd to inspect your card.") end
 end
 local function recordKill(id,c)
     c.overworldVerified=true
@@ -187,7 +187,7 @@ local function source(guid,amount)
         local tier=F.tier(c)
         F.copy(c)
         if F.discovered and F.tier(c)>tier then F.discovered(id,F.perks[F.tier(c)]) end
-        F.say(c.name.." / "..c.lifetime.." copies")
+        if F.db.collectionChat~=false then F.say(c.name.." / "..c.lifetime.." copies") end
     end
 end
 local stagedLoot={}
@@ -268,7 +268,7 @@ end
 
 function F.enableOwnershipTooltip()
     local function annotate(tooltip)
-        if tooltip~=GameTooltip or not tooltip.GetUnit then return end
+        if F.db.ownershipTooltip==false or tooltip~=GameTooltip or not tooltip.GetUnit then return end
         local ok,_,unit=pcall(tooltip.GetUnit,tooltip)
         if not ok or not F.plain(unit) or type(unit)~="string" then return end
         local owned,card=F.ownershipStatus(unit)
@@ -276,7 +276,7 @@ function F.enableOwnershipTooltip()
         local emblem=("|T%s:14:14:0:0|t"):format(ownershipBadge(owned))
         local status=owned and F.uiColors.gold.."Collected" or F.uiColors.muted.."Uncollected"
         tooltip:AddLine(emblem.."  FeralDeck  /  "..status.."|r",.92,.95,.99)
-        if not owned then
+        if not owned and F.db.killTooltip~=false then
             local limit=F.balance.firstCopyLimit
             local kills=card and card.kills or 0
             tooltip:AddLine(("First-copy progress: %d / %d credited kills"):format(math.min(kills,limit),limit),.74,.80,.86)
@@ -294,36 +294,47 @@ function F.updateOwnershipPlate(unit)
     activePlates[unit]=true
     local badge=badges[unit]
     if badge then badge:Hide() end
+    if F.db.ownershipBadges==false then return end
     local owned=F.ownershipStatus(unit)
     if owned==nil or F.read(UnitCanAttack,"player",unit)~=true then return end
     local plate=C_NamePlate and F.read(C_NamePlate.GetNamePlateForUnit,unit)
     if not plate or F.read(plate.IsForbidden,plate)==true then return end
-    local name=F.read(function()
+    local position=F.db.badgePosition or "Name right"
+    local left=position=="Name left" or position=="Bar left"
+    local bar=position=="Bar left" or position=="Bar right"
+    local anchor=F.read(function()
         local frame=plate.UnitFrame
         if not frame then return end
+        if bar then return frame.healthBar or frame.HealthBar end
         local text=frame.name or frame.Name or frame.NameText or frame.nameText
         if text and text.GetStringWidth then return text end
     end)
-    if not name or F.read(name.IsShown,name)==false then return end
+    if not anchor or F.read(anchor.IsShown,anchor)==false then return end
     -- Some nameplates center the text in a fixed-width label. Use the end
     -- of the rendered name, rather than the edge of that label.
-    local offset=5
-    local width,textWidth=F.read(name.GetWidth,name),F.read(name.GetStringWidth,name)
-    if type(width)=="number" and type(textWidth)=="number" and textWidth>0 then
-        local slack=math.max(0,width-textWidth)
-        local alignment=F.read(name.GetJustifyH,name)
-        if alignment=="CENTER" then offset=offset-slack/2
-        elseif alignment=="LEFT" then offset=offset-slack end
+    local offset=bar and 7 or 5
+    if not bar then
+        local width,textWidth=F.read(anchor.GetWidth,anchor),F.read(anchor.GetStringWidth,anchor)
+        if type(width)=="number" and type(textWidth)=="number" and textWidth>0 then
+            local slack=math.max(0,width-textWidth)
+            local alignment=F.read(anchor.GetJustifyH,anchor)
+            if alignment=="CENTER" then offset=offset-slack/2
+            elseif alignment==(left and "RIGHT" or "LEFT") then offset=offset-slack end
+        end
     end
     if not badge then
         badge=UIParent:CreateTexture(nil,"OVERLAY",nil,7)
-        badge:SetSize(12,12)
         badges[unit]=badge
     end
+    local size=F.db.badgeSize or 12
+    badge:SetSize(size,size)
     badge:ClearAllPoints()
-    if not pcall(badge.SetPoint,badge,"LEFT",name,"RIGHT",offset,0) then return end
+    local point=left and "RIGHT" or "LEFT"
+    local relative=left and "LEFT" or "RIGHT"
+    if not pcall(badge.SetPoint,badge,point,anchor,relative,left and -offset or offset,0) then return end
     badge:SetTexture(ownershipBadge(owned))
-    badge:SetAlpha(owned and .86 or .73)
+    local opacity=F.db.badgeOpacity
+    badge:SetAlpha(opacity=="Bright" and 1 or opacity=="Dim" and (owned and .60 or .47) or (owned and .86 or .73))
     badge:Show()
 end
 

@@ -42,7 +42,16 @@ Action colors are consistent across the journal, deck builder, and battle. Tacti
 
 The primary creature type sets the color and engraving of its card frame. Both type badges appear on dual-type cards. The habitat supplies the scenery and is listed beneath the badges on the full card.
 
-Use the controls in the top bar on any page. **Motion** switches between full effects and reduced motion. Reduced motion skips the flip, glints, pointer motion, meter animation and combat flourishes. **Sound** controls FeralDeck audio on WoW's SFX channel. **Size** switches between fit and large text and controls for TV play. Both sizes fit within the available game window. These preferences persist across reloads. The addon uses the game's native controller input while the FeralDeck window is open. It adds no global bindings and makes no changes to Steam Input.
+Open **Settings** in the top bar. Preferences persist across reloads.
+
+- **Display** offers Azure Glass, Dark Mode, Forest Green, and Amber Forge. Theme and window opacity are independent. Display also controls window scale, card scenery, engravings, foil, and idle models.
+- **Collection** sets discovery and perk popups, card reveals, journal sort, opening tab, and collection chat messages.
+- **Battle options** controls playback speed, animation, arena scenery, initiative portraits, HP previews, and whether new matches start with the combat log open.
+- **Nameplates** controls badge visibility, placement, size, and brightness, plus ownership and first-copy progress in unit tooltips.
+- **Audio** chooses the WoW sound channel and which cues play. Sound mode can play all enabled cues, rewards only, or mute the addon.
+- **Controls** offers reduced motion, controller navigation, and a toggle for controller shortcut hints. Controller navigation uses the game's native input while the window is open.
+
+Use **Reset category** or **Reset all settings** and confirm to restore the relevant defaults. Resets operate on preferences and keep your collection and decks.
 
 ### Controller navigation
 

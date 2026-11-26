@@ -40,6 +40,42 @@ F.uiColors={
     synergy="|cff99e6db",
 }
 
+local palettes={
+    ["Azure Glass"]={
+        textureTint={1,1,1}, accent={.86,.68,.40}, accentText=F.uiColors.gold,
+        control={.123,.176,.243}, edge={.48,.61,.76}, selected={.18,.26,.36}, selectedEdge={.62,.73,.85},
+        primary={.43,.31,.17}, primaryEdge={.87,.71,.46},
+    },
+    ["Dark Mode"]={
+        neutral=true, textureTint={.48,.50,.55}, accent={.79,.84,.94}, accentText="|cffe1e7f4",
+        control={.13,.14,.17}, edge={.53,.56,.64}, selected={.22,.24,.30}, selectedEdge={.72,.78,.88},
+        primary={.25,.31,.43}, primaryEdge={.72,.80,.94},
+    },
+    ["Forest Green"]={
+        neutral=true, textureTint={.53,1,.73}, accent={.63,.83,.53}, accentText="|cffd7edbc",
+        control={.11,.23,.16}, edge={.43,.66,.52}, selected={.17,.32,.22}, selectedEdge={.64,.82,.63},
+        primary={.23,.38,.20}, primaryEdge={.73,.87,.57},
+    },
+    ["Amber Forge"]={
+        neutral=true, textureTint={1,.72,.46}, accent={.96,.68,.37}, accentText="|cffffd7a4",
+        control={.24,.15,.09}, edge={.74,.53,.36}, selected={.35,.23,.14}, selectedEdge={.85,.65,.44},
+        primary={.44,.27,.12}, primaryEdge={.95,.72,.46},
+    },
+}
+
+function F.theme()
+    return palettes[F.db and F.db.uiTheme] or palettes["Azure Glass"]
+end
+
+function F.themeTexture(file,palette)
+    return F.media..file..(palette.neutral and "Neutral" or "")..".tga"
+end
+
+function F.themeSurface(texture,file,palette)
+    texture:SetTexture(F.themeTexture(file,palette))
+    texture:SetVertexColor(unpack(palette.textureTint))
+end
+
 function F.showTooltip(owner,anchor,title,body)
     GameTooltip:SetOwner(owner,anchor)
     GameTooltip:SetText(title,1,.84,.56,1,true)

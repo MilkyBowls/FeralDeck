@@ -2,10 +2,10 @@ local _, F = ...
 local panel,tab,selected,role,tier,ready=nil,"Collection",nil,0,-1,false
 local query,peer,draftName="","",""
 local draft,slot,confirm,history={},1,nil,0
-local draftTactics,queued,fast,logOpen={},nil,false,false
+local draftTactics,queued,logOpen={},nil,false
 local choosingDeck,deckPage=false,1
 local deckTools=false
-local settingsOpen=false
+local settingsOpen,settingsPage,settingsReset=false,1,nil
 local navigation,closeButton,textEntry
 local pools,used={},{}
 local librarySort,journalSort,atlasSort,statsSort=1,1,1,1
@@ -15,6 +15,7 @@ local deckQuery,deleteDeck="",nil
 local tacticSort,tacticFilter,logSort,logFilter=1,1,1,1
 local colors,fonts=F.uiColors,F.fonts
 local gold=colors.gold
+local palette=F.theme()
 local function rarity(c)
     local value=c.rarity or "Common"
     return (F.rarityColors[value] or "")..value.."|r"
@@ -36,15 +37,13 @@ local function item(kind)
         elseif kind=="edit" then
             w=CreateFrame("EditBox",nil,panel,"BackdropTemplate")
             w:SetBackdrop({bgFile=F.media.."GlassButton.tga",edgeFile="Interface\\Buttons\\WHITE8X8",edgeSize=1})
-            w:SetBackdropColor(.063,.095,.141,1)
-            w:SetBackdropBorderColor(.37,.49,.64,.55)
             w:SetScript("OnEditFocusGained",function(self)
-                self:SetBackdropColor(.093,.14,.206,1)
-                self:SetBackdropBorderColor(.63,.77,.94,.94)
+                self:SetBackdropColor(unpack(palette.selected))
+                self:SetBackdropBorderColor(unpack(palette.selectedEdge))
             end)
             w:SetScript("OnEditFocusLost",function(self)
-                self:SetBackdropColor(.063,.095,.141,1)
-                self:SetBackdropBorderColor(.37,.49,.64,.55)
+                self:SetBackdropColor(unpack(palette.control))
+                self:SetBackdropBorderColor(unpack(palette.edge))
             end)
             w:SetTextInsets(9,9,0,0)
             w:SetAutoFocus(false)
@@ -76,6 +75,11 @@ local function item(kind)
         w:SetAlpha(1)
         w:SetVertexColor(1,1,1,1)
         w:SetTexCoord(0,1,0,1)
+    end
+    if kind=="edit" then
+        local focused=w.HasFocus and w:HasFocus()
+        w:SetBackdropColor(unpack(focused and palette.selected or palette.control))
+        w:SetBackdropBorderColor(unpack(focused and palette.selectedEdge or palette.edge))
     end
     w:ClearAllPoints()
     w:Show()
@@ -118,9 +122,9 @@ local function section(x,y,width,height,title)
     local glass=item("icon")
     place(glass,x,y,width,height)
     glass:SetDrawLayer("BACKGROUND",1)
-    glass:SetTexture(F.media..(width/height>=3 and "JournalStrip.tga" or "JournalPane.tga"))
+    F.themeSurface(glass,width/height>=3 and "JournalStrip" or "JournalPane",palette)
     if title then
-        label(x+14,y+11,width-28,22,gold..title.."|r"):SetFontObject(fonts.heading)
+        label(x+14,y+11,width-28,22,palette.accentText..title.."|r"):SetFontObject(fonts.heading)
     end
 end
 local function creature(x,y,width,height,id,facing,zoom)
@@ -154,8 +158,9 @@ local function button(x,y,width,s,fn,tip,enabled,kind)
     end
     w:EnableMouseWheel(false)
     w:SetScript("OnMouseWheel",nil)
-    w:SetBackdropColor(.123,.176,.243,enabled==false and .42 or .91)
-    w:SetBackdropBorderColor(.48,.61,.76,enabled==false and .13 or .27)
+    local base,edge=palette.control,palette.edge
+    w:SetBackdropColor(base[1],base[2],base[3],enabled==false and .42 or .91)
+    w:SetBackdropBorderColor(edge[1],edge[2],edge[3],enabled==false and .13 or .27)
     w:SetEnabled(enabled~=false)
     w:SetScript("OnClick",function() fn() F.refresh() end)
     w:SetScript("OnEnter",function(self)
@@ -171,15 +176,16 @@ end
 local function tone(w,kind)
     if w:IsEnabled()==false then return w end
     if kind=="primary" then
-        w:SetBackdropColor(.43,.31,.17,1)
-        w:SetBackdropBorderColor(.87,.71,.46,.79)
+        w:SetBackdropColor(unpack(palette.primary))
+        w:SetBackdropBorderColor(unpack(palette.primaryEdge))
         w:SetNormalFontObject(fonts.bold)
     elseif kind=="danger" then
         w:SetBackdropColor(.28,.115,.14,1)
         w:SetBackdropBorderColor(.72,.35,.39,.75)
     else
-        w:SetBackdropColor(.18,.26,.36,1)
-        w:SetBackdropBorderColor(.62,.73,.85,.64)
+        w:SetBackdropColor(unpack(palette.selected))
+        local edge=palette.selectedEdge
+        w:SetBackdropBorderColor(edge[1],edge[2],edge[3],.64)
         w:SetNormalFontObject(fonts.bold)
     end
     return w
@@ -282,7 +288,7 @@ local function banner(x,y,width,height,art)
     else
         section(x,y,width,height)
     end
-    surface(x,y+height-1,width,1,.49,.40,.26):SetDrawLayer("BACKGROUND",2)
+    surface(x,y+height-1,width,1,unpack(palette.accent)):SetAlpha(.57)
 end
 local function equip(pos,id)
     if draft[pos]==id then slot,pending=pos,nil return end
@@ -370,7 +376,7 @@ local function inspect(id)
     selected,confirm=id,nil
     perksPage,synergiesPage,showCombatStats=1,1,false
     inspectorView="Overview"
-    reveal=c.unseen and id or nil
+    reveal=F.db.revealCards~=false and c.unseen and id or nil
     c.unseen=nil
 end
 local habitatFilter,newOnly=0,false
@@ -1014,7 +1020,7 @@ local function collection()
         if id==rowID then
             tone(row,"active")
         else
-            row:SetBackdropColor(.105,.151,.218,.88)
+            row:SetBackdropColor(palette.control[1]*.87,palette.control[2]*.87,palette.control[3]*.87,.88)
         end
         row:EnableMouseWheel(true)
         row:SetScript("OnMouseWheel",scroll)
@@ -1371,6 +1377,7 @@ local function battleHabitat(b)
     return F.speciesOf(b[3-b.me].cards[1].id)[1]
 end
 local function outcome(b)
+    local animate=not F.db.staticCards and F.db.battleMotion~=false
     local won=b.winner==b.me and not b.aborted
     local result=b.aborted and "Duel interrupted" or b.winner==0 and "Draw" or won and "Victory" or "Defeat"
     local first=not b.presented
@@ -1417,7 +1424,7 @@ local function outcome(b)
             face(x+43,229,144,201,a.id,F.db.cards[a.id],{showcase=true,state="Earned mastery"})
         end
         local cap=F.balance.mastery[F.tier({mastery=a.before})+1] or math.max(20,a.after)
-        local start=first and not F.db.staticCards and a.before or a.after
+        local start=first and animate and a.before or a.after
         surface(meterX,meterY,rewardWidth,10,.21,.24,.17)
         fills[i]=surface(meterX,meterY,math.max(1,rewardWidth*math.min(1,start/cap)),10,.87,.60,.22)
         fills[i]:SetDrawLayer("ARTWORK")
@@ -1428,12 +1435,12 @@ local function outcome(b)
             label(meterX,meterY+64,rewardWidth,38,gold.."Perk unlocked  /  "..a.perk.."|r")
         end
     end
-    if first and (not F.db.staticCards or hasPerk) then
+    if first and (animate or hasPerk) then
         local age=0
         panel:SetScript("OnUpdate",function(self,dt)
             age=age+dt
-            local t=math.min(1,math.max(0,(age-(won and 1.22 or .15))/(F.db.staticCards and .001 or .50)))
-            head:SetAlpha(F.db.staticCards and 1 or .62+.38*math.min(1,age/.22))
+            local t=animate and math.min(1,math.max(0,(age-(won and 1.22 or .15))/.50)) or 1
+            head:SetAlpha(animate and .62+.38*math.min(1,age/.22) or 1)
             for i,a in ipairs(awards) do
                 local cap=F.balance.mastery[F.tier({mastery=a.before})+1] or math.max(20,a.after)
                 local value=a.before+(a.after-a.before)*t
@@ -1513,11 +1520,13 @@ local function battle()
     local p,e=b[b.me],b[3-b.me]
     local result=b.aborted or (b.winner==0 and "Draw" or b.winner and (b.winner==b.me and "Victory" or "Defeat"))
     if arena~=b then
-        queued,logOpen,battleSynergy,autoBattle,aimMove,selectedTarget=nil,false,nil,false,nil,nil
+        queued,logOpen,battleSynergy,autoBattle,aimMove,selectedTarget=nil,F.db.battleLogDefault,nil,false,nil,nil
         battleSynergyPage=1
         arena,shown,actor,elapsed=b,b.timeline and 0 or b.seq,1,0
     end
     local event=b.events[shown+1]
+    local fast=F.db.fastBattle
+    local animate=not F.db.staticCards and F.db.battleMotion~=false
     local state=event or b
     if b.timeline then
         actor=b.actor
@@ -1557,15 +1566,21 @@ local function battle()
         local zone=battleHabitat(b)
         local scenery=F.habitatStyle(zone).art
         local painting=F.arenaPaintings[scenery]
-        local backdrop=paper(22,175,660,356,painting or scenery,-1,painting and .81 or .71)
-        if painting then backdrop:SetTexCoord(.035,.965,.05,.95) end
+        if F.db.arenaScenery~=false then
+            local backdrop=paper(22,175,660,356,painting or scenery,-1,painting and .81 or .71)
+            if painting then backdrop:SetTexCoord(.035,.965,.05,.95) end
+        else
+            section(22,175,660,356)
+        end
         if zone~="" and zone~="Unknown" then
             label(355,94,270,20,gold..zone.."|r"):SetJustifyH("CENTER")
             local fieldNotes=F.areaProfiles[zone]
             if fieldNotes then hoverHelp(355,91,270,20,zone,fieldNotes[2]) end
         end
-        local shade=paper(22,175,660,356,"ArenaVignette",0)
-        shade:SetTexCoord(0,1,0,1)
+        if F.db.arenaScenery~=false then
+            local shade=paper(22,175,660,356,"ArenaVignette",0)
+            shade:SetTexCoord(0,1,0,1)
+        end
         section(22,117,660,55)
         section(698,117,260,163)
         section(698,290,260,241)
@@ -1692,7 +1707,7 @@ local function battle()
                 local shieldText=event.broken>0 and (event.broken.." shield broken") or (event.absorbed.." blocked")
                 label(351,276,278,33,event.hit.." HP loss / "..shieldText):SetJustifyH("CENTER")
             end
-            if not F.db.staticCards then
+            if animate then
                 for side,m in pairs(models) do
                     if m.beat~=event then
                         m:SetAnimation(side==event.side and (event.move=="S" and 53 or event.move=="B" and 1 or 16) or 20)
@@ -1705,7 +1720,7 @@ local function battle()
         end
     end
     local animateTimeline,animateCards
-    local playbackDuration=F.db.staticCards and .25 or .78
+    local playbackDuration=animate and .78 or .25
     if b.solo and b.timeline and (b.arena or not (logOpen or synergyDetail)) then
         local railX,railY,stride=b.arena and 212 or 302,b.arena and 123 or 264,b.arena and 72 or 63
         local order=event and event.timeline or F.turnTimeline(b)
@@ -1734,7 +1749,7 @@ local function battle()
             local card=b[turn.side].cards[turn.slot]
             local color=turn.side==b.me and "|cff9ee2bb" or "|cfff0a89e"
             local portrait
-            if b.arena then
+            if b.arena and F.db.timelineModels~=false then
                 portrait=creature(x+4,railY+2,50,36,card.id,turn.side==b.me and .38 or -.38,.48)
                 if portrait.SetPaused then portrait:SetPaused(true) end
             end
@@ -1758,7 +1773,7 @@ local function battle()
             slides[i]={edge=edge,tile=tile,caption=caption,portrait=portrait,x=x,from=railX+((from or #order)-1)*stride,fresh=not from}
             details[i]=("%d. %s (%s, Speed %d)"):format(i,card.name,turn.side==b.me and "Ally" or "Rival",F.cardSpeed(card))
         end
-        if event and not F.db.staticCards then
+        if event and animate then
             local progress=surface(railX,b.arena and 166 or 251,1,2,.41,.78,.73)
             animateTimeline=function(age)
                 local t=math.min(1,age/.36)
@@ -1860,7 +1875,7 @@ local function battle()
                     if event and active then attacker={widget,x,y,side} end
                     if impacted then targetCard={widget,x,y,unit} end
                     local model=widget.model
-                    local animating=event and not F.db.staticCards and (active or impacted)
+                    local animating=event and animate and (active or impacted)
                     if animating and model.arenaBeat~=event then
                         model:SetAnimation(active and (event.move=="S" and 53 or event.move=="B" and 1 or 16) or 20)
                         model.arenaBeat=event
@@ -1897,7 +1912,7 @@ local function battle()
                                     or preview.absorbed>0 and preview.hit==0 and "Blocked" or (preview.hit.." damage"))
                                 widget.targetCue:Show()
                                 widget.targetPlate:Show()
-                                if preview.hit>0 then
+                                if F.db.healthPreview~=false and preview.hit>0 then
                                     widget.healthGhost:SetPoint("BOTTOMLEFT",widget,"BOTTOMLEFT",8+arenaHealthWidth*(unit.hp-preview.hit)/unit.maxHP,4)
                                     widget.healthGhost:SetSize(arenaHealthWidth*preview.hit/unit.maxHP,16)
                                     widget.healthGhost:SetColorTexture(.86,.34,.27,.85)
@@ -1931,7 +1946,7 @@ local function battle()
                 end
             end
         end
-        if event and not F.db.staticCards and attacker then
+        if event and animate and attacker then
             animateCards=function(age)
                 local pulse=math.sin(math.pi*math.min(1,age/.38))
                 local card=attacker[1]
@@ -2087,7 +2102,7 @@ local function battle()
         end
     end
     button(29,658,155,logOpen and "Hide combat log" or "Show combat log",function() logOpen=not logOpen battleSynergy,aimMove,selectedTarget=nil,nil,nil end,"Review completed actions, damage, and synergy triggers.")
-    button(194,658,173,fast and "Playback: fast" or "Playback: normal",function() fast=not fast end,"Change playback speed without changing battle rules.")
+    button(194,658,173,fast and "Playback: fast" or "Playback: normal",function() F.db.fastBattle=not fast end,"Change playback speed without changing battle rules.")
     if b.solo then
         local auto=button(600,658,188,autoBattle and "Pause Auto Battle" or "Auto Battle",function()
             autoBattle=not autoBattle
@@ -2099,8 +2114,7 @@ local function battle()
     if event then
         if not event.sounded then
             event.sounded=true
-            local synergyCue=({pack="pack",tunnel="tunnel",whiteout="whiteout"})[event.payoff or ""]
-            F.sound(synergyCue or (event.payoff or event.combo) and "combo" or event.move=="S" and "signature" or event.absorbed>0 and "shield" or event.hit>0 and ({"hit","hit2","hit3"})[shown%3+1] or "shield")
+            F.battleSound(event,shown)
         end
         panel:SetScript("OnUpdate",function(_,dt)
             elapsed=elapsed+dt*(fast and 3 or 1)
@@ -2135,7 +2149,7 @@ local function openTab(dest)
     if dest~=tab then
         for _,box in ipairs(pools.edit or {}) do box:ClearFocus() end
     end
-    settingsOpen=false
+    settingsOpen,settingsReset=false,nil
     picker=nil deckTools,choosingDeck=false,false tab=dest confirm=nil F.notice=nil pending=nil deleteDeck=nil
     if dest=="Decks" and panel.draftOpened~=true then loadDraft() panel.draftOpened=true end
 end
@@ -2153,6 +2167,7 @@ end
 
 local function controllerBack()
     if textEntry then textEntry=nil
+    elseif settingsOpen and settingsReset then settingsReset=nil
     elseif settingsOpen then settingsOpen=false
     elseif tab=="Decks" and deleteDeck then deleteDeck=nil
     elseif tab=="Decks" and choosingDeck then choosingDeck=false
@@ -2171,9 +2186,65 @@ local function controllerBack()
     F.refresh()
 end
 
+local function applySetting(key,value)
+    if F.db[key]==value then return end
+    F.setPreference(F.db,key,value)
+    if key=="journalOrder" then
+        journalSort=value
+        resetGrid()
+    elseif key=="controllerNav" and not value then
+        navigation:mouse()
+    elseif key=="discoveryToasts" or key=="perkToasts" or key=="uiTheme" then
+        F.refreshDiscoverySettings()
+    end
+end
+
+local function drawSettings(width)
+    banner(22,89,width-44,62,"Woodland")
+    label(39,101,300,35,"Settings"):SetFontObject(fonts.title)
+    section(22,162,191,435)
+    local group=F.settingGroups[settingsPage]
+    for i,category in ipairs(F.settingGroups) do
+        local page=i
+        local categoryButton=button(35,175+(i-1)*39,165,category.title,function()
+            settingsPage,settingsReset=page,nil
+        end)
+        if i==settingsPage then tone(categoryButton,"active") end
+    end
+    local x=228
+    local rowWidth=width-x-22
+    for i,row in ipairs(group.rows) do
+        local y=162+(i-1)*63
+        section(x,y,rowWidth,57)
+        label(x+15,y+7,rowWidth-255,20,row[2]):SetFontObject(fonts.heading)
+        label(x+15,y+28,rowWidth-255,27,row[3]):SetFontObject(fonts.muted)
+        local choices=F.settingChoices(row)
+        local index=F.settingIndex(F.db,row)
+        local choice=choices[index]
+        tone(button(width-235,y+15,196,row[2]..": "..(choice[2] or choice[1]),function()
+            settingsReset=nil
+            applySetting(row[1],choices[index%#choices+1][1])
+            if group.title=="Nameplates" then F.refreshOwnershipPlates() end
+        end,row[3]),"active")
+    end
+    local function reset(which)
+        if settingsReset~=which then settingsReset=which return end
+        for _,category in ipairs(which=="all" and F.settingGroups or {group}) do
+            for _,row in ipairs(category.rows) do applySetting(row[1],F.settingChoices(row)[1][1]) end
+        end
+        F.refreshOwnershipPlates()
+        settingsReset=nil
+    end
+    button(x,609,194,settingsReset=="page" and "Confirm reset category" or "Reset category",function() reset("page") end)
+    button(x+205,609,180,settingsReset=="all" and "Confirm reset all" or "Reset all settings",function() reset("all") end)
+    if settingsReset then
+        label(x,644,rowWidth,20,colors.muted.."This resets preferences only. Your cards and decks are kept.|r"):SetFontObject(fonts.small)
+    end
+end
+
 local function navigationContext()
     if textEntry then return "text" end
-    if settingsOpen then return "settings" end
+    if settingsOpen then return "settings:"..settingsPage end
     if tab=="Decks" then
         if choosingDeck then return "saved" end
         if picker then return "tactic-picker" end
@@ -2226,6 +2297,8 @@ end
 
 function F.refresh()
     if not panel or not panel:IsShown() then return end
+    palette=F.theme()
+    F.db.lastTab=tab
     panel:SetScript("OnUpdate",nil)
     local fighting=tab=="Battle" and F.match and (not F.net or F.net.phase=="play")
     local width,height=fighting and 980 or 960,fighting and 720 or 719
@@ -2233,20 +2306,24 @@ function F.refresh()
     local fit=math.min((UIParent:GetWidth()-16)/width,(UIParent:GetHeight()-16)/height)
     local preferred=F.db.largeUI and math.max(1.55,math.min(2.25,fit*.85))
         or math.max(1.12,math.min(1.42,fit*.68))
+    if F.db.largeUI=="compact" then preferred=.92 end
     panel:SetScale(math.min(fit,preferred))
     used={}
     navigation:begin(navigationContext())
     if F.db.opaqueUI then
         local backing=paper(0,0,width,height,"JournalOpaque",-4)
+        F.themeSurface(backing,"JournalOpaque",palette)
         backing:SetTexCoord(0,1,0,1)
     end
     local shell=paper(0,0,width,height,"JournalShell",-3)
+    F.themeSurface(shell,"JournalShell",palette)
     shell:SetTexCoord(0,1,0,1)
-    surface(22,69,width-44,1,.43,.56,.69):SetAlpha(.28)
+    surface(22,69,width-44,1,unpack(palette.edge)):SetAlpha(.38)
     section(214,19,382,43)
     section(width-178,19,166,43)
-    paper(23,22,27,27,"Compass",0)
-    label(60,23,151,37,gold.."FeralDeck|r"):SetFontObject(fonts.brand)
+    paper(23,22,27,27,"Compass",0):SetVertexColor(unpack(palette.accent))
+    label(60,23,151,37,palette.accentText.."FeralDeck|r"):SetFontObject(fonts.brand)
+    closeButton:SetBackdropColor(palette.control[1],palette.control[2],palette.control[3],.94)
     if textEntry then
         drawTextEntry(width)
     else
@@ -2257,52 +2334,19 @@ function F.refresh()
             local w=button(x,26,115,display,function() openTab(dest) end)
             if tab==name and not settingsOpen then
                 tone(w,"active")
-                surface(x+40,54,35,2,.86,.68,.40):SetDrawLayer("ARTWORK")
+                surface(x+40,54,35,2,unpack(palette.accent)):SetDrawLayer("ARTWORK")
             else
-                w:SetBackdropColor(.16,.22,.30,.34)
-                w:SetBackdropBorderColor(.49,.61,.74,.13)
+                w:SetBackdropColor(palette.selected[1],palette.selected[2],palette.selected[3],.34)
+                w:SetBackdropBorderColor(palette.edge[1],palette.edge[2],palette.edge[3],.13)
             end
         end
         local settingsButton=button(width-171,26,119,settingsOpen and "Back to "..(tab=="Collection" and "Journal" or tab) or "Settings",function()
-            settingsOpen=not settingsOpen
+            settingsOpen,settingsReset=not settingsOpen,nil
             for _,box in ipairs(pools.edit or {}) do box:ClearFocus() end
-        end,"Display, sound, motion, and panel opacity.")
+        end,"Customize FeralDeck.")
         if settingsOpen then
             tone(settingsButton,"active")
-            banner(22,91,width-44,114,"Woodland")
-            label(42,107,482,37,"Settings"):SetFontObject(fonts.title)
-            label(43,158,482,24,"Display, motion, and audio"):SetFontObject(fonts.muted)
-            local preferences={
-                {"Motion","Controls card reveals, model movement, and combat animation.",
-                    F.db.staticCards and "Motion: reduced" or "Motion: full",
-                    function() F.db.staticCards=not F.db.staticCards end},
-                {"Sound","Plays all cues, rewards only, or mutes the addon.",
-                    "Sound: "..F.db.audioMode,function()
-                        F.db.audioMode=({Full="Rewards Only",["Rewards Only"]="Off",Off="Full"})[F.db.audioMode]
-                        F.db.sounds=F.db.audioMode~="Off"
-                    end},
-                {"Interface size","Fit adapts to the window. Large uses more of the available space.",
-                    F.db.largeUI and "Size: large" or "Size: fit",
-                    function() F.db.largeUI=not F.db.largeUI end},
-                {"Window background","Choose translucent glass or a solid background for busy scenes.",
-                    F.db.opaqueUI and "Background: opaque" or "Background: glass",
-                    function() F.db.opaqueUI=not F.db.opaqueUI end},
-                {"Controller navigation","Use the D-pad and face buttons while FeralDeck is open.",
-                    F.db.controllerNav~=false and "Controller: on" or "Controller: off",
-                    function()
-                        F.db.controllerNav=F.db.controllerNav==false
-                        if not F.db.controllerNav then navigation:mouse() end
-                    end},
-            }
-            local cardWidth=(width-58)/2
-            for i,setting in ipairs(preferences) do
-                local x=22+(i-1)%2*(cardWidth+14)
-                local y=222+math.floor((i-1)/2)*142
-                section(x,y,cardWidth,124)
-                label(x+17,y+13,cardWidth-34,22,setting[1]):SetFontObject(fonts.heading)
-                label(x+17,y+44,cardWidth-34,34,setting[2]):SetFontObject(fonts.muted)
-                tone(button(x+17,y+84,197,setting[3],setting[4],setting[2]),"active")
-            end
+            drawSettings(width)
         elseif tab=="Collection" then collection() elseif tab=="Decks" then decks() else battle() end
     end
     if not textEntry then navigation:add(closeButton,width-42,26,26,26,"close") end
@@ -2341,7 +2385,16 @@ local function toggle()
         table.insert(UISpecialFrames,"FeralDeckPanel")
         panel:Hide()
     end
-    if panel:IsShown() then panel:Hide() else panel:Show() F.refresh() end
+    if panel:IsShown() then
+        panel:Hide()
+    else
+        local openingTab=F.db.startTab=="Remember" and F.db.lastTab or F.db.startTab
+        for _,dest in ipairs(mainTabs) do
+            if openingTab==dest and tab~=dest then openTab(dest) break end
+        end
+        panel:Show()
+        F.refresh()
+    end
 end
 local function refreshKillCredit()
     F.refreshOwnershipPlates()
@@ -2380,6 +2433,7 @@ frame:SetScript("OnEvent",function(_,event,...)
         if ...~="FeralDeck" then return end
         FeralDeckDB=FeralDeckDB or {}
         F.migrate(FeralDeckDB)
+        journalSort=F.db.journalOrder
         F.register()
         if F.enableOwnershipTooltip then F.enableOwnershipTooltip() end
         SLASH_FERALDECK1="/fd"

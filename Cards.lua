@@ -497,6 +497,7 @@ local function migrate(db)
 end
 function F.migrate(db)
     migrate(db)
+    F.initSettings(db)
     if db.schema==6 then return end
     db.cards=db.cards or {}
     for _,c in pairs(db.cards) do

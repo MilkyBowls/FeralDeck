@@ -22,7 +22,6 @@ function F.controllerNavigation(panel,back,switchTab)
     ring:EnableMouse(false)
     ring:SetFrameLevel(panel:GetFrameLevel()+16)
     ring:SetBackdrop({edgeFile="Interface\\Buttons\\WHITE8X8",edgeSize=2})
-    ring:SetBackdropBorderColor(1,.79,.36,1)
     ring:Hide()
 
     local hint=panel:CreateFontString(nil,"OVERLAY")
@@ -50,8 +49,9 @@ function F.controllerNavigation(panel,back,switchTab)
         ring:ClearAllPoints()
         ring:SetPoint("TOPLEFT",panel,"TOPLEFT",node.x-2,2-node.y)
         ring:SetSize(node.w+4,node.h+4)
+        ring:SetBackdropBorderColor(unpack(F.theme().primaryEdge))
         ring:Show()
-        hint:SetShown(not nav.hideHint)
+        hint:SetShown(not nav.hideHint and F.db.controllerHints~=false)
     end
 
     local function focus(node)

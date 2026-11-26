@@ -5,7 +5,7 @@ if probe then probe:close() end
 unpack=unpack or table.unpack
 local function client(freshSave)
     local f={}
-    for _,file in ipairs({"Cards","Moves","Relay","Loot","Duels"}) do
+    for _,file in ipairs({"Cards","Settings","Moves","Relay","Loot","Duels"}) do
         assert(loadfile(root..file..".lua"))("FeralDeck",f)
     end
     f.migrate(freshSave and {} or {wins=0})
@@ -730,12 +730,17 @@ do
     local justify="CENTER"
     local name={GetWidth=function() return 140 end,GetStringWidth=function() return 100 end,
         GetJustifyH=function() return justify end}
-    local plate={UnitFrame={name=name,healthBar={}}}
+    local bar={}
+    local plate={UnitFrame={name=name,healthBar=bar}}
     local badge={
-        SetSize=function(_,width,height) assert(width==12 and height==12) end,
+        SetSize=function(_,width,height) assert(width==H.db.badgeSize and height==width) end,
         SetAlpha=function(self,alpha) self.alpha=alpha end,
         ClearAllPoints=function() end,
         SetPoint=function(_,point,relative,side,x,y)
+            if H.db.badgePosition=="Bar left" then
+                assert(point=="RIGHT" and relative==bar and side=="LEFT" and x==-7 and y==0)
+                return
+            end
             assert(point=="LEFT" and relative==name and side=="RIGHT" and y==0)
             assert(x==(justify=="CENTER" and -15 or 5))
         end,
@@ -758,6 +763,13 @@ do
     justify="RIGHT"
     H.refreshOwnershipPlates()
     assert(badge.visible)
+    H.db.badgePosition,H.db.badgeSize,H.db.badgeOpacity="Bar left",16,"Dim"
+    H.refreshOwnershipPlates()
+    assert(badge.visible and badge.alpha==.60)
+    H.db.ownershipBadges=false
+    H.refreshOwnershipPlates()
+    assert(not badge.visible)
+    H.db.ownershipBadges,H.db.badgePosition,H.db.badgeSize,H.db.badgeOpacity=true,"Name right",12,"Subtle"
     plate.UnitFrame.name=nil
     H.refreshOwnershipPlates()
     assert(not badge.visible)
@@ -947,6 +959,9 @@ methods.GetFrameLevel=function() return 2 end
 methods.GetModelFileID=function() return nil end
 methods.SetText=function(w,s) w.text=s end
 methods.GetText=function(w) return rawget(w,"text") or "" end
+methods.SetTexture=function(w,path) w.asset=path end
+methods.SetColorTexture=function(w) w.asset=nil end
+methods.SetVertexColor=function(w,r,g,b) w.tint={r,g,b} end
 methods.SetEnabled=function(w,b) w.enabled=b end
 methods.IsShown=function(w) return w.visible end
 methods.Show=function(w) w.visible=true end
@@ -977,8 +992,8 @@ methods.IsVisible=function(w)
     local parent=rawget(w,"parent")
     return not parent or parent:IsVisible()
 end
-local cues={}
-PlaySoundFile=function(path) cues[path]=(cues[path] or 0)+1 end
+local cues,lastChannel={}
+PlaySoundFile=function(path,channel) cues[path]=(cues[path] or 0)+1 lastChannel=channel end
 local function countCue(name) return cues[F.media..name..".mp3"] or 0 end
 
 methods.GetWidth=function() return windowW end
@@ -1061,6 +1076,7 @@ do
     SlashCmdList.FERALDECK()
     assert(panel:IsShown() and panel.padEnabled)
     click("Settings")
+    click("Controls")
     click("Controller: on")
     assert(F.db.controllerNav==false and not panel.padEnabled)
     panel.scripts.OnGamePadButtonDown(panel,"PADRSHOULDER")
@@ -1403,7 +1419,7 @@ assert(F.play(draw,1,draw.actor,"B"))
 draw.events[60]=nil
 F.finish(draw) F.refresh()
 assert(draw.winner==0 and draw.presented and visibleText("|cffe1d4b4DRAW|r"))
-click("Edit Deck") click("Field Journal") click("Settings") click("Motion: full") click("Sound: Full")
+click("Edit Deck") click("Field Journal") click("Settings") click("Controls") click("Motion: full") click("Audio") click("Sound: Full")
 local n=countCue("place")
 F.sound("place") assert(countCue("place")==n)
 local chime=countCue("perk")
@@ -1411,16 +1427,80 @@ F.sound("perk") assert(countCue("perk")==chime+1)
 click("Sound: Rewards Only")
 assert(F.db.staticCards and F.db.sounds==false and not inspected())
 F.sound("discovery") assert(countCue("discovery")==1)
+click("Display")
 click("Size: fit")
 click("Background: glass")
 assert(F.db.opaqueUI)
+do
+    local db=F.db
+    local cards,decks=db.cards,db.decks
+    local function themedShell(file)
+        for _,w in ipairs(widgets) do
+            if w:IsVisible() and w.asset==F.media..file..".tga" then return w end
+        end
+    end
+    assert(themedShell("JournalShell"))
+    click("Theme: Azure Glass")
+    assert(db.uiTheme=="Dark Mode" and themedShell("JournalOpaqueNeutral"))
+    local dark=assert(themedShell("JournalShellNeutral")).tint
+    assert(dark[1]<.6 and dark[2]<.6 and dark[3]<.6)
+    click("Theme: Dark Mode")
+    assert(db.uiTheme=="Forest Green" and themedShell("JournalShellNeutral").tint[2]==1)
+    click("Theme: Forest Green")
+    assert(db.uiTheme=="Amber Forge" and themedShell("JournalShellNeutral").tint[1]==1)
+    click("Card scenery: Full")
+    assert(db.cardScenery=="Dim")
+    click("Battle options")
+    click("Playback: normal")
+    assert(db.fastBattle)
+    click("Nameplates")
+    click("Icon placement: Name right")
+    click("Icon size: Small")
+    assert(db.badgePosition=="Name left" and db.badgeSize==16)
+    F.migrate(db)
+    assert(db.fastBattle and db.badgeSize==16 and db.cardScenery=="Dim" and db.uiTheme=="Amber Forge")
+    click("Reset category")
+    assert(db.badgePosition=="Name left")
+    click("Confirm reset category")
+    assert(db.badgePosition=="Name right" and db.badgeSize==12 and db.fastBattle)
+    click("Audio")
+    click("Reset category")
+    click("Confirm reset category")
+    click("Sound channel: SFX")
+    click("Combat sounds: on")
+    local hits=countCue("hit")
+    F.sound("hit")
+    assert(countCue("hit")==hits)
+    F.sound("discovery")
+    assert(lastChannel=="Master")
+    click("Reset all settings")
+    assert(db.cardScenery=="Dim")
+    click("Confirm reset all")
+    assert(db.cardScenery=="Full" and not db.fastBattle and db.audioChannel=="SFX")
+    assert(db.cards==cards and db.decks==decks)
+    for _,fixture in ipairs({
+        {"hit",{hit=2}}, {"hit2",{hit=2},1}, {"hit3",{hit=2},2},
+        {"shield",{absorbed=2}}, {"break",{broken=2,hit=1}},
+        {"guard",{move="B"}}, {"mark",{mark=true}}, {"technique",{move="X"}},
+        {"signature",{move="S",hit=3}}, {"combo",{payoff="rime"}},
+        {"pack",{payoff="pack"}}, {"tunnel",{payoff="tunnel"}}, {"whiteout",{payoff="whiteout"}},
+    }) do
+        local cue,event,index=fixture[1],fixture[2],fixture[3] or 0
+        event.hit,event.absorbed,event.broken,event.guard=event.hit or 0,event.absorbed or 0,event.broken or 0,event.guard or 0
+        local before=countCue(cue)
+        F.battleSound(event,index)
+        assert(countCue(cue)==before+1)
+    end
+    click("Display")
+    assert(db.uiTheme=="Azure Glass" and themedShell("JournalShell") and not themedShell("JournalShellNeutral"))
+end
 click("Back to Journal")
 local preferredSize=F.db.largeUI
 for _,large in ipairs({false,true}) do
     F.db.largeUI=large
     for _,size in ipairs({{800,600},{1280,720},{1920,1080},{3440,1440},{3840,2160}}) do
         windowW,windowH=size[1],size[2]
-        for _,tab in ipairs({"Deck Builder","Battle","Field Journal"}) do
+        for _,tab in ipairs({"Deck Builder","Battle","Field Journal","Settings"}) do
             click(tab)
             for _,w in ipairs(widgets) do
                 local parent=rawget(w,"parent")

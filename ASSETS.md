@@ -14,19 +14,16 @@ The fonts' notices ship in Media as Barlow-OFL.txt and Cinzel-OFL.txt.
 
 ## Interface audio
 
-Kenney created these sounds and released them under CC0 1.0. The WAV distribution identifies the original pack and its license. The shipped files are mono MP3 conversions. [Original Interface Sounds](https://kenney.nl/assets/interface-sounds) · [WAV distribution and license](https://github.com/Calinou/kenney-interface-sounds) · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+Original sound effects synthesized for FeralDeck and released under CC0 1.0. All cues ship as 44.1 kHz mono MP3s at 128 kbps.
 
-| Shipped file | Source recording | Event |
-| --- | --- | --- |
-| `discovery.mp3` | `confirmation_001.wav` | First discovery |
-| `place.mp3` | `drop_001.wav` | Card placement or brace |
-| `shield.mp3` | `glass_004.wav` | Shield absorption |
-| `hit.mp3` | `click_001.wav` | Clean hit |
-| `combo.mp3` | `glass_001.wav` | Consumed mark |
-| `signature.mp3` | `maximize_005.wav` | Signature |
-| `victory.mp3` | `confirmation_004.wav` | Victory |
-| `perk.mp3` | `confirmation_002.wav` | Perk or prestige unlock |
-| `defeat.mp3` | `minimize_003.wav` | Quiet finish |
+| Shipped files | Events |
+| --- | --- |
+| `hit.mp3`, `hit2.mp3`, `hit3.mp3` | Rotating clean-hit impacts |
+| `shield.mp3`, `guard.mp3`, `break.mp3` | Shield absorption, guard, and shield break |
+| `mark.mp3`, `technique.mp3`, `signature.mp3` | Mark application, non-damaging utility actions, and signatures |
+| `combo.mp3`, `pack.mp3`, `tunnel.mp3`, `whiteout.mp3` | Generic combos and the Pack Hunt, Hold the Tunnel, and Whiteout synergies |
+| `place.mp3`, `reveal.mp3`, `discovery.mp3`, `perk.mp3` | Card placement, reveal, first discovery, and perk unlock |
+| `victory.mp3`, `defeat.mp3`, `draw.mp3`, `interrupted.mp3` | Battle results |
 
 ## Original journal art
 
@@ -69,3 +66,5 @@ ArenaVignette and ArenaBrass are original lighting and metallic trim textures fo
 ArenaHighlands and ArenaWoodland are original generated environment paintings created for FeralDeck. The battle view renders the Blizzard creature models as separate live layers.
 
 The glass theme uses original TGA textures. JournalShell is the 1,024 × 1,024 window surface. JournalOpaque is the matching solid backing for the opaque setting. JournalPane and JournalStrip cover reading surfaces and compact rows. HeroShade keeps text legible over illustrated headers. GlassButton supplies the shared control fill and hover sheen.
+
+The Neutral variants of JournalShell, JournalOpaque, JournalPane, and JournalStrip preserve the original alpha channels and use grayscale color channels for runtime theme tinting.

@@ -14,9 +14,29 @@ end
 
 local reward={discovery=true,reveal=true,perk=true,victory=true,defeat=true,draw=true,interrupted=true}
 function F.sound(cue)
-    if F.db and (F.db.audioMode=="Full" or F.db.audioMode=="Rewards Only" and reward[cue]) and PlaySoundFile then
-        PlaySoundFile(media .. (cue=="tunnel" and "Pickaxe.ogg" or cue .. ".mp3"), "SFX")
+    local setting=(cue=="discovery" or cue=="reveal") and "discoveryCues"
+        or reward[cue] and "rewardCues" or cue=="place" and "placementCues" or "battleCues"
+    if F.db and F.db[setting]~=false
+        and (F.db.audioMode=="Full" or F.db.audioMode=="Rewards Only" and reward[cue]) and PlaySoundFile then
+        PlaySoundFile(media .. cue .. ".mp3", F.db.audioChannel or "SFX")
     end
+end
+
+local synergyCues={pack="pack",tunnel="tunnel",whiteout="whiteout"}
+local hitCues={"hit","hit2","hit3"}
+function F.battleSound(event,index)
+    local cue=synergyCues[event.payoff]
+    if not cue then
+        if event.payoff or event.combo then cue="combo"
+        elseif event.move=="S" then cue="signature"
+        elseif event.broken>0 then cue="break"
+        elseif event.absorbed>0 then cue="shield"
+        elseif event.hit>0 then cue=hitCues[index%#hitCues+1]
+        elseif event.mark then cue="mark"
+        elseif event.move=="B" or event.guard>0 then cue="guard"
+        else cue="technique" end
+    end
+    F.sound(cue)
 end
 
 local function texture(parent, layer, file)
@@ -218,7 +238,7 @@ local function bindCardIdentity(w,c,types,width,footer,zone,habitat,o,rank)
         corner:SetTexCoord(right and u2 or u1,right and u1 or u2,bottom and v2 or v1,bottom and v1 or v2)
         corner:SetSize(cornerSize,cornerSize)
         corner:SetVertexColor(metal[1],metal[2],metal[3],bottom and .74 or .98)
-        corner:SetShown(c~=nil)
+        corner:SetShown(c~=nil and F.db.cardOrnaments~=false)
     end
     w.portraitRail:SetBackdropBorderColor(primary[1],primary[2],primary[3],c and .64 or .28)
     w.footerArt:SetSize(width-6,footer)
@@ -279,7 +299,12 @@ function F.bindFace(w,id,c,width,height,options)
     local cardArt=painting or habitat.art..((o.ornate or o.arenaFace) and "" or "Depth")
     w.art:SetTexture(media..(c and cardArt or "WolfSeal")..".tga")
     local tint=c and (painting and .94 or o.arenaFace and .72 or o.ornate and .87 or 1) or .60
-    w.art:SetVertexColor(tint,tint,tint)
+    if c and F.db.cardScenery=="Off" then
+        w.art:SetColorTexture(.065,.085,.11,1)
+    else
+        if c and F.db.cardScenery=="Dim" then tint=tint*.54 end
+        w.art:SetVertexColor(tint,tint,tint)
+    end
     local rank=c and (c.prestige or c.rank or 0) or 0
     local types=c and (c.types or F.typesOf(id,c)) or {}
     local edge=rank>0 and edges[(rank-1)%4+1] or typeColors[types[1]] or habitat.edge
@@ -306,7 +331,7 @@ function F.bindFace(w,id,c,width,height,options)
     w.model:SetSize(width-18,math.max(1,artH-4))
     w.icon:SetSize(math.min(artH*.68,width*.68),math.min(artH*.68,width*.68))
     w.foil:SetSize(width*.70,math.max(1,artH-8))
-    w.foil:SetAlpha(rank>0 and .42 or 0)
+    w.foil:SetAlpha(rank>0 and F.db.cardFoil~=false and .42 or 0)
     local unit=o.unit
     w.health:SetShown(unit~=nil)
     w.healthGhost:Hide()
@@ -337,7 +362,7 @@ function F.bindFace(w,id,c,width,height,options)
     w.icon:SetShown(c~=nil and not o.sealed)
     if c and not o.sealed then
         w.model:Show()
-        if w.model.SetPaused then w.model:SetPaused(F.db.staticCards==true) end
+        if w.model.SetPaused then w.model:SetPaused(F.db.staticCards==true or (F.db.pauseModels==true and not o.arenaFace)) end
         if w.boundID~=id then
             w.model:ClearModel()
             w.model.arenaBeat=nil
@@ -401,20 +426,33 @@ function F.bindFace(w,id,c,width,height,options)
 end
 
 local queue,toast={},nil
+local toastTheme
+local function themeToast()
+    local palette=F.theme()
+    if toastTheme==palette then return end
+    toastTheme=palette
+    toast:SetBackdrop({bgFile=F.themeTexture("JournalShell",palette),edgeFile="Interface\\Buttons\\WHITE8X8",edgeSize=1})
+    toast:SetBackdropColor(unpack(palette.textureTint))
+    toast:SetBackdropBorderColor(unpack(palette.primaryEdge))
+    toast.rule:SetColorTexture(unpack(palette.accent))
+end
+
+local function toastEnabled(perk)
+    if perk then return F.db.perkToasts~=false end
+    return F.db.discoveryToasts~=false
+end
 local function showNext()
     local entry=table.remove(queue,1)
+    while entry and not toastEnabled(entry.perk) do entry=table.remove(queue,1) end
     if not entry then if toast then toast:Hide() toast:SetScript("OnUpdate",nil) end return end
     if not toast then
         toast=CreateFrame("Frame",nil,UIParent,"BackdropTemplate")
         toast:SetFrameStrata("HIGH")
         toast:SetPoint("TOP",UIParent,"TOP",0,-64)
         toast:SetSize(326,112)
-        toast:SetBackdrop({bgFile=media.."JournalShell.tga",edgeFile="Interface\\Buttons\\WHITE8X8",edgeSize=1})
-        toast:SetBackdropBorderColor(.58,.47,.32)
         toast.rule=texture(toast,"ARTWORK")
         toast.rule:SetPoint("TOPLEFT",90,-21)
         toast.rule:SetSize(26,1)
-        toast.rule:SetColorTexture(.79,.61,.34,1)
         toast.face=F.newFace(toast)
         toast.face:SetPoint("LEFT",11,0)
         toast:EnableMouse(false)
@@ -425,6 +463,7 @@ local function showNext()
         toast.msg:SetJustifyH("LEFT")
         toast.msg:SetJustifyV("TOP")
     end
+    themeToast()
     local id=entry.id
     local c=F.db.cards[id]
     F.bindFace(toast.face,id,c,66,92,{mini=true,showcase=true})
@@ -432,6 +471,7 @@ local function showNext()
     toast.msg:SetText(colors.gold..(entry.perk and "Perk unlocked" or "Field discovery").."|r\n"..c.name
         .."\n"..(entry.perk and colors.success..entry.perk or colors.muted..F.speciesOf(id)[1].."  /  Open /fd").."|r")
     toast.group=not entry.perk and 1 or nil
+    toast.perk=entry.perk
     toast:Show()
     F.sound(entry.perk and "perk" or "discovery")
     local elapsed=0
@@ -441,7 +481,13 @@ local function showNext()
         if elapsed>=2.8 then showNext() end
     end)
 end
+function F.refreshDiscoverySettings()
+    if toast and toast:IsShown() then
+        if toastEnabled(toast.perk) then themeToast() else showNext() end
+    end
+end
 function F.discovered(id,perk)
+    if not toastEnabled(perk) then F.sound(perk and "perk" or "discovery") return end
     if not perk and toast and toast:IsShown() and toast.group then
         toast.group=toast.group+1
         F.bindFace(toast.face,id,F.db.cards[id],66,92,{mini=true,showcase=true})
