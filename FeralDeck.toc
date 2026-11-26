@@ -1,0 +1,15 @@
+## Interface: 16001
+## Title: Feral Deck
+## Version: 2.22.3
+## Notes: Collect creature cards and play Relay.
+## OptionalDeps: FieldGuideForever, QuestieDB
+## SavedVariables: FeralDeckDB
+Cards.lua
+Moves.lua
+Relay.lua
+Loot.lua
+Duels.lua
+Theme.lua
+JournalCard.lua
+Controller.lua
+Panel.lua
